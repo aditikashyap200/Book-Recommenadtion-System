@@ -1,0 +1,58 @@
+# Install necessary packages
+!pip install pandas scikit-surprise
+
+import pandas as pd
+from surprise import Reader, Dataset, SVD
+from surprise.model_selection import train_test_split
+from surprise import accuracy
+
+# Load the dataset
+data = {
+    'user_id': [1, 1, 1, 2, 2, 2, 3, 3, 3],
+    'book_id': [101, 102, 103, 101, 102, 104, 101, 103, 104],
+    'rating': [5, 3, 4, 4, 2, 5, 2, 5, 4]
+}
+
+df = pd.DataFrame(data)
+
+# Load data into Surprise dataset
+reader = Reader(rating_scale=(1, 5))
+dataset = Dataset.load_from_df(df[['user_id', 'book_id', 'rating']], reader)
+
+# Split the dataset into train and test set
+trainset, testset = train_test_split(dataset, test_size=0.25, random_state=42)
+
+# Use SVD (Singular Value Decomposition) algorithm
+model = SVD()
+
+# Train the model
+model.fit(trainset)
+
+# Test the model
+predictions = model.test(testset)
+accuracy.rmse(predictions)
+
+# Function to get book recommendations for a user
+def get_recommendations(user_id, n_recommendations=5):
+    # Get a list of all book_ids
+    all_book_ids = df['book_id'].unique()
+    # Get book_ids that the user has already rated
+    rated_books = df[df['user_id'] == user_id]['book_id'].tolist()
+    # Create a list of book_ids that the user has not rated
+    books_to_rate = [book_id for book_id in all_book_ids if book_id not in rated_books]
+
+    # Predict ratings for books the user has not rated
+    predictions = [model.predict(user_id, book_id) for book_id in books_to_rate]
+
+    # Sort predictions by estimated rating in descending order
+    recommendations = sorted(predictions, key=lambda x: x.est, reverse=True)
+
+    # Get the top n recommendations
+    top_recommendations = recommendations[:n_recommendations]
+
+    return [(rec.iid, rec.est) for rec in top_recommendations]
+
+# Example usage
+user_id = 1
+recommendations = get_recommendations(user_id)
+print(f"Top recommendations for user {user_id}: {recommendations}")
